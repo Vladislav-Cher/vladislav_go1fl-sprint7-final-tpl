@@ -3,10 +3,12 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCafeNegative(t *testing.T) {
@@ -46,5 +48,89 @@ func TestCafeWhenOk(t *testing.T) {
 		handler.ServeHTTP(response, req)
 
 		assert.Equal(t, http.StatusOK, response.Code)
+	}
+}
+
+func TestCafeCount(t *testing.T) {
+	handler := http.HandlerFunc(mainHandle)
+
+	requests := []struct {
+		count int
+		want  int
+	}{
+		{0, 0},
+		{1, 1},
+		{2, 2},
+		{100, len(cafeList["moscow"])},
+	}
+
+	for _, v := range requests {
+		response := httptest.NewRecorder()
+		url := "/cafe?city=moscow&count=" + strconv.Itoa(v.count)
+		req := httptest.NewRequest("GET", url, nil)
+
+		handler.ServeHTTP(response, req)
+
+		require.Equal(t, http.StatusOK, response.Code)
+
+		bodyString := strings.TrimSpace(response.Body.String())
+		bodySlice := strings.Split(bodyString, ",")
+		if bodyString == "" {
+			bodySlice = []string{}
+		}
+
+		if v.count > 0 && bodySlice == nil {
+			t.Error("response body is empty")
+			return
+		}
+
+		assert.Equal(t, v.want, len(bodySlice))
+	}
+}
+
+func TestCafeSearch(t *testing.T) {
+	handler := http.HandlerFunc(mainHandle)
+
+	requests := []struct {
+		search    string
+		wantCount int
+	}{
+		{"фасоль", 0},
+		{"кофе", 2},
+		{"вилка", 1},
+	}
+
+	for _, v := range requests {
+		response := httptest.NewRecorder()
+		url := "/cafe?city=moscow&search=" + v.search
+		req := httptest.NewRequest("GET", url, nil)
+
+		handler.ServeHTTP(response, req)
+
+		require.Equal(t, http.StatusOK, response.Code)
+
+		bodyString := strings.TrimSpace(strings.ToLower(response.Body.String()))
+		bodySlice := strings.Split(bodyString, ",")
+		if bodyString == "" {
+			bodySlice = []string{}
+		}
+		if bodySlice == nil {
+			t.Error("response body is empty")
+			return
+		}
+
+		var countContains int
+		for _, s := range bodySlice {
+			if strings.Contains(s, v.search) {
+				countContains++
+			}
+		}
+
+		if countContains != len(bodySlice) {
+			t.Error("not all cafe from response body contain the word from search")
+			return
+		}
+
+		assert.Equal(t, v.wantCount, countContains)
 	}
 }
