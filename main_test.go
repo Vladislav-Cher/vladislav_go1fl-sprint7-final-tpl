@@ -119,18 +119,8 @@ func TestCafeSearch(t *testing.T) {
 			return
 		}
 
-		var countContains int
 		for _, s := range bodySlice {
-			if strings.Contains(s, v.search) {
-				countContains++
-			}
+			assert.Contains(t, s, v.search)
 		}
-
-		if countContains != len(bodySlice) {
-			t.Error("not all cafe from response body contain the word from search")
-			return
-		}
-
-		assert.Equal(t, v.wantCount, countContains)
 	}
 }
